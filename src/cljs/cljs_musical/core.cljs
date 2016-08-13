@@ -8,8 +8,11 @@
 ;; Views
 
 (defn home-page []
-  [:div [:h2 "Welcome to cljs-musical"]
-   [:div [:a {:href "/about"} "go to about page"]]])
+  [:a-scene
+   [:a-box {:color "#6173F4"
+            :width "4"
+            :height "1"
+            :depth "2"}]])
 
 (defn about-page []
   [:div [:h2 "About cljs-musical"]
