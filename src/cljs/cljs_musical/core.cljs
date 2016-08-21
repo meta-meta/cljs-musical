@@ -9,10 +9,13 @@
 
 (defn home-page []
   [:a-scene
-   [:a-box {:color "#6173F4"
-            :width "4"
-            :height "1"
-            :depth "2"}]])
+   [:a-entity {:text "text: \uE050; font: Bravura"
+               :position "0 0 -5"
+               :material "color: #66E1B4"}]
+   [:a-entity {:text "text: \uE1D9; font: Bravura"
+               :position "1 0 -5"
+               :material "color: #544"}]
+   ])
 
 (defn about-page []
   [:div [:h2 "About cljs-musical"]
