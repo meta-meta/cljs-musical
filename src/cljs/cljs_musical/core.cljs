@@ -16,23 +16,31 @@
 
 (defn clearinterval [] (js/clearInterval jsinterval))
 
-(defn glyph [g pos] [:a-entity {:text     (str "text: " (g glyphs) "; font: Bravura")
-                            :position (string/join " " pos)
-                            :material "color: #000"}])
 
-(defn staff [n] (->> (range 0 n) (map (fn [i] (glyph :staff-5 [i 0 -10])))))
+(defn vecstr [v] (string/join " " v))
+
+(defn glyph [g pos] [:a-entity {:text     (str "text: " (g glyphs) "; font: Bravura")
+                                :key pos
+                                :position (vecstr pos)
+                                :material "color: #000"}])
+
+(def charwidth 0.35)
+
+(defn staff [n] (->> (range 0 n)
+                     (map (fn [i] (glyph :staff-5 [(* i charwidth) 0 0])))))
 
 (defn home-page []
   [:a-scene
-   (staff 10)
-   (glyph :staff-5 [0 0 -5])
-   [:a-entity {:text     (str "text: " (:t @appstate))
-               :position "-1 0 -5"
-               :abcd ""
-               :material "color: #544"}]
-   [:a-entity {:text     "text: \uE1D9; font: Bravura"
-               :position "1 0 -5"
-               :material "color: #544"}]
+   [:a-entity {:position "0 0 -5"}
+    (staff 10)
+    (glyph :staff-5 [0 0 0])
+    [:a-entity {:text     (str "text: " (:t @appstate))
+                :position "-1 0 -5"
+                :abcd     ""
+                :material "color: #544"}]
+    [:a-entity {:text     "text: \uE1D9; font: Bravura"
+                :position "1 0 -5"
+                :material "color: #544"}]]
    ])
 
 (defn about-page []
