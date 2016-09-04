@@ -13,7 +13,7 @@
              [name :- s/Str
               seq :- [s/Int]])
 
-(defn all-positive [vec]
+(defn all-positive? [vec]
   (reduce (fn [acc val] (and acc (> val 0))) seq))
 
 (defn sum-vec [vec] (reduce + vec))
@@ -24,7 +24,7 @@
               seq :- (s/pred (fn [seq]
                                (and
                                  (= 12 (sum-vec seq))
-                                 (all-positive seq))
+                                 (all-positive? seq))
                                ))])
 
 (defn compare-pitch-class [a b]
