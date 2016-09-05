@@ -16,44 +16,67 @@
 
 ;; a map of note-value to relative duration {:1 1 :2 0.5 :4 0.25 ...}
 ;; :1 = whole note, :2 = half note, etc.
-(def note-values (let [divisors (take-while (partial >= resolution)
-                                            (iterate (partial * 2) 1))
-                       keys (map #(keyword (str %)) divisors)
-                       multipliers (map #(/ 1 %) divisors)]
-                   (zipmap keys multipliers)))
+;; :1. = dottef whole note, :2. = dotted half note, etc. depending on resolution
+(def note-value->duration (let [divisors (take-while (partial >= resolution)
+                                                     (iterate (partial * 2) 1))
+                                keys (map #(keyword (str %)) divisors)
+                                multipliers (map #(/ 1 %) divisors)
+                                dotted-divisors (take-while (partial > resolution) divisors)
+                                dotted-keys (map #(keyword (str % ".")) dotted-divisors)
+                                dotted-multipliers (map #(* 1.5 (/ 1 %)) dotted-divisors)]
+                            (conj (zipmap keys multipliers)
+                                  (zipmap dotted-keys dotted-multipliers))))
 
-(def duration->note-values (zipmap (vals note-values) (keys note-values)))
+;; TODO: handle compound values: duration = 112 = :4. + :16
+(def duration->note-value (clojure.set/map-invert note-value->duration))
 
 ;; https://en.wikipedia.org/wiki/Tuplet#Triplets
-(defn triplet-duration [note-value] (* (/ 2 3) (note-value note-values)))
+(defn triplet-duration [note-value] (* (/ 2 3) (note-value note-value->duration)))
 
 (s/defrecord TimeSignature
   [beats-per-measure :- s/Int
    beat-unit :- s/Keyword])
 
-(defn note-value->ticks [note-value]
-  (* resolution
-     (note-value note-values)))
+(defn note-value->ticks [note-value] (* resolution
+                                        (note-value note-value->duration)))
+
+(defn ticks->note-value [ticks] (duration->note-value (/ ticks resolution)))
 
 (defn ticks-per-measure [time-sig]
   (* (:beats-per-measure time-sig)
      (note-value->ticks (:beat-unit time-sig))))
 
-;; crops a phrase to include only notes and partial notes which should be drawn in the measure
+;; crops a phrase to include only events that are played within the measure
+;; events which start before the measure or end after the start of the next will have their
+;; duration reduced to fit and assigned a flag to indicate a tie
 (defn crop-phrase-to-measure [start-tick time-sig phrase]
   (let [event-start-ticks (->> (:events phrase)
                                (map :note-value)
                                (map note-value->ticks)
                                (reductions + (:start phrase)))
-        start-tick-to-event (zipmap event-start-ticks (:events phrase))
-        left-cropped-tick-to-events (drop-while #(<= (+ (key %)
-                                                        (note-value->ticks (:note-value (val %))))
-                                                     start-tick)
-                                                start-tick-to-event)
         next-measure-start-tick (+ start-tick (ticks-per-measure time-sig))
-        cropped-tick-to-events (take-while #(< (key %)
-                                               next-measure-start-tick)
-                                           left-cropped-tick-to-events)
+        event-end (fn [event] (+ (:start event)
+                                 (note-value->ticks (:note-value event))))
+        precedes-measure? (fn [event] (<= (event-end event) start-tick))
+        starts-before-measure? (fn [event] (< (:start event) start-tick))
+        starts-in-measure? (fn [event] (< (:start event) next-measure-start-tick))
+        ends-after-measure? (fn [event] (> (event-end event) next-measure-start-tick))
         ]
-    cropped-tick-to-events)
-  )
+    (->> (:events phrase)
+         (map (fn [start-tick event] (assoc event :start start-tick)) event-start-ticks)
+         (drop-while precedes-measure?)
+         (take-while starts-in-measure?)
+         (map (fn [event]
+                (cond
+                  (starts-before-measure? event) (assoc event
+                                                   :tie true
+                                                   :note-value (ticks->note-value
+                                                                 (- start-tick
+                                                                    (:start event))))
+
+                  (ends-after-measure? event) (assoc event
+                                                :tie true
+                                                :note-value (ticks->note-value
+                                                              (- next-measure-start-tick
+                                                                 (:start event))))
+                  :else event))))))
