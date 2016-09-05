@@ -69,13 +69,13 @@
          (map (fn [event]
                 (cond
                   (starts-before-measure? event) (assoc event
-                                                   :tie true
+                                                   :tie :close
                                                    :note-value (ticks->note-value
                                                                  (- start-tick
                                                                     (:start event))))
 
                   (ends-after-measure? event) (assoc event
-                                                :tie true
+                                                :tie :open
                                                 :note-value (ticks->note-value
                                                               (- next-measure-start-tick
                                                                  (:start event))))
