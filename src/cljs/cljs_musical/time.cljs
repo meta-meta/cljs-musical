@@ -16,7 +16,8 @@
 
 ;; a map of note-value to relative duration {:1 1 :2 0.5 :4 0.25 ...}
 ;; :1 = whole note, :2 = half note, etc.
-;; :1. = dottef whole note, :2. = dotted half note, etc. depending on resolution
+;; :1. = dotted whole note, :2. = dotted half note, etc. depending on resolution
+;; duration is relative to beat. :1 = 1 beat, :2 = 1/2 beat
 (def note-value->duration (let [divisors (take-while (partial >= resolution)
                                                      (iterate (partial * 2) 1))
                                 keys (map #(keyword (str %)) divisors)
@@ -35,7 +36,7 @@
 
 (s/defrecord TimeSignature
   [beats-per-measure :- s/Int
-   beat-unit :- s/Keyword])
+   beat-unit :- (s/pred #(note-value->duration %) "beat-unit is a valid note-value")])
 
 (defn note-value->ticks [note-value] (* resolution
                                         (note-value note-value->duration)))
