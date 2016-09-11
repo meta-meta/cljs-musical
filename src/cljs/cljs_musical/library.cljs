@@ -27,6 +27,10 @@
                                  (all-positive? seq))
                                ))])
 
+
+;; PITCH CLASS   PITCH CLASS   PITCH CLASS   PITCH CLASS   PITCH CLASS   PITCH CLASS   PITCH CLASS   PITCH CLASS
+
+
 (defn compare-pitch-class [a b]
   (let [a (name a)
         b (name b)
@@ -40,11 +44,16 @@
 
 (def pitch-classes (sorted-set-by compare-pitch-class :c :db :d :e :eb :f :f# :g :ab :a :bb :b))
 
-(def pc-cycle-up (cycle (:pitch-classes library)))
+(def pc-cycle-up (cycle pitch-classes))
 
 (defn pitch-class? [pc] (contains? (set pitch-classes) pc))
 
 (def PitchClass (s/pred #(contains? (set pitch-classes) %) "contained in pitch-classes"))
+
+
+
+;; KEY   KEY   KEY   KEY   KEY   KEY   KEY   KEY   KEY   KEY   KEY   KEY   KEY   KEY   KEY   KEY   KEY   KEY
+
 
 ;; Key is a set of pitch-classes and a tonic
 ;TODO: pitch-classes must contain tonic
@@ -69,20 +78,24 @@
 ;    )
 ;  )
 
-(defn scale-tonic-to-key-name [scale tonic]
+(defn scale->key-name [scale tonic]
   (keyword (str (name tonic) "-" (name (:name scale)))))
 
-(defn scale-to-key-iter [scale pitches]
+(defn scale->key-iter [scale pitches]
   (cons (first pitches)
         (if-not (empty? scale)
-          (scale-to-key-iter (drop 1 scale)
-                             (drop (first scale) pitches)))))
+          (scale->key-iter (drop 1 scale)
+                           (drop (first scale) pitches)))))
 
-(defn scale-to-key [scale tonic]
-  (Key. (scale-tonic-to-key-name scale tonic)
-        (scale-to-key-iter (:seq scale)
-                           (drop-while #(not= tonic %) pc-cycle-up))
+(defn scale->key [scale tonic]
+  (Key. (scale->key-name scale tonic)
+        (scale->key-iter (:seq scale)
+                         (drop-while #(not= tonic %) pc-cycle-up))
         tonic))
+
+
+
+
 
 (def library {
               :names                           {
@@ -101,12 +114,14 @@
                                                 :octatonic  (Scale. :octatonic [1 2 1 2 1 2 1 2])
                                                 }
 
-              :keys                            (zipmap (map (partial scale-tonic-to-key-name diatonic-scale) pitch-classes)
-                                                       (map (partial scale-to-key diatonic-scale) pitch-classes))
+              :keys                            (zipmap (map (partial scale->key-name diatonic-scale)
+                                                            pitch-classes)
+                                                       (map (partial scale->key diatonic-scale)
+                                                            pitch-classes))
 
               :pitch-classes                   pitch-classes
               :pc-cycle-up                     pc-cycle-up
-              :pc-cycle-dn                     (cycle (reverse (:pitch-classes library)))
+              :pc-cycle-dn                     (cycle (reverse pitch-classes))
 
               :notes-all                       (set (range 0 128))
               :notes-ewi                       (set (range 34 100))
