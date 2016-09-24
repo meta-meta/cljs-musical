@@ -107,35 +107,56 @@
                      (mod % 12)))))
 
 
+(def note-num->pitch-class (zipmap notes-all pc-cycle-up))
+(def letter->note-num {;TODO: programatically #, b, E, B
+                       :C  0
+                       :C# 1
+                       :Db 1
+                       :D  2
+                       :D# 3
+                       :Eb 3
+                       :E  4
+                       :Fb 4
+                       :F  5
+                       :F# 6
+                       :Gb 6
+                       :G  7
+                       :G# 8
+                       :Ab 8
+                       :A  9
+                       :A# 10
+                       :Bb 10
+                       :B  11
+                       :Cb 11
+                       })
+
 (s/defrecord Key
   [name :- s/Str
    notes :- [Note]
-   tonic :- Note])
+   tonic :- Note
+   tonic-name :- s/Keyword])
 
-(defn scale->key [scale tonic tonic-name]
-  (Key. (scale->key-name scale tonic-name)
-        (all-notes-in-interval-seq (:seq scale) tonic)
-        tonic
-        )
+(defn scale->key [scale tonic-name]                         ;tonic-name because enharmonic
+  (let [tonic-num (letter->note-num tonic-name)]
+    (Key. (scale->key-name scale tonic-name)
+          (all-notes-in-interval-seq (:seq scale) tonic-num)
+          tonic-num
+          tonic-name
+          ))
   )
 
-(def accidental->val {
-                      :# 1
-                      :b -1
-                      })
 
-(def val->accidental (clojure.set/map-invert accidental->val))
-
-(def note-num->pitch-class (zipmap notes-all pc-cycle-up))
-;(def letter->note-num (clojure.set/map-invert note-num->pitch-class))
-
-
-;http://music.stackexchange.com/questions/8329/temporarily-changing-keys-which-accidentals-to-use
-(defn spell-notes [start-letter start-num]
+; here we generate a default chromatic spelling for each key, prefering # or b based on how the diatonic notes are spelled. if the diatonic scale contains #, prefer #. this leaves :C ambiguous. the algorithm here ends up using b
+; the pitch 7 in key of :C# should be Fx(double sharp) technically
+; at some point we'll want to account for musical context (# for ascending accidentals, b for decending) but the rule is ill-defined and subjective: http://music.stackexchange.com/questions/8329/temporarily-changing-keys-which-accidentals-to-use
+; more here: http://www.themusicalear.com/sharps-or-flats-how-to-spell-notes-correctly/
+; https://www.wolframalpha.com/input/?i=c-sharp+major+scale
+(defn spell-notes [key]
   (let [
+        start-num (:tonic key)
         notes-in-key (interval-seq->note-seq (drop-last (:seq diatonic-scale)) start-num)
         octave (range start-num (+ 12 start-num))
-        letter->num (fn [l n] (->> (map (fn [a b] [a b])
+        letter->num (fn [l n] (->> (map (fn [a b] [a b])    ;[[:C 0] [:D 2] ...]
                                         pc-cycle-nat-up
                                         (all-notes-in-interval-seq
                                           (:seq diatonic-scale)
@@ -156,6 +177,7 @@
         hasAccidental? (fn [letter n] (let [pc (note-num->pitch-class n)]
                                         (or (not (natural? pc))
                                             (not= letter pc))))
+        start-letter (keyword (first (name (:tonic-name key))))
         num->letter (zipmap notes-in-key
                             (map name
                                  (drop-while #(not= start-letter %)
@@ -182,10 +204,20 @@
                                         ))))]
     (map spell-note octave)))
 
-;(spell-notes :C 0)
+(def key-names (keys letter->note-num))
 
-(defn note-num->note-name [note-num key]
+(def key-name->note-spellings (zipmap key-names
+                                 (->> key-names
+                                      (map #(scale->key diatonic-scale %))
+                                      (map spell-notes)
+                                      )))
 
+(defn note-num->note-name [note-num key-name]
+  (let [note-spellings (key-name key-name->note-spellings)]
+    ((zipmap (map letter->note-num
+                  note-spellings)
+             note-spellings)
+      (mod note-num 12)))
   )
 
 
