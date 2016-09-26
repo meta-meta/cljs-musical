@@ -20,6 +20,7 @@
    (include-css (if (env :dev) "/css/site.css" "/css/site.min.css"))
    (include-js "https://aframe.io/releases/0.3.0/aframe.js")
    (include-js "aframe-text-component.js")
+   (include-js "https://cdn.rawgit.com/ngokevin/kframe/master/components/sun-sky/dist/aframe-sun-sky.min.js")
    (include-js "fonts/Bravura_Regular.js")
    ])
 
