@@ -7,7 +7,8 @@
             [schema.core :as s
              :include-macros true
              ])
-  (:use [cljs-musical.glyphs :only [glyphs]]))
+  (:use [cljs-musical.glyphs :only [glyphs]]
+        [cljs-musical.library :only [note-num->note-name pc-cycle-nat-up pc-cycle-nat-dn]]))
 
 
 (def appstate (r/atom {:t 0}))
@@ -25,7 +26,12 @@
   (set! (.-intervalid js/window) nil))
 
 
+
+;; PRESENTATION DATA TYPES
+
 ;; on the presentation side of things, as opposed to the library, we only care about the output data. not so much the theory that generated it.
+
+
 (def NoteValue (s/pred (fn [x] (and (keyword? x)
                                     (contains? (set (map #(Math/pow 2 %)
                                                          (range 6)))
@@ -43,57 +49,143 @@
   [data :- #{s/Num}
    note-value :- NoteValue])
 
+(s/defrecord Clef
+  [glyph :- s/Keyword
+   bottom-note :- s/Num                                     ; the note at bottom of staff
+   staff-offset :- s/Num]                                   ; vertical position of glyph on staff
+  )
 
-(defn vecstr [v] (string/join " " v))
+
+
+
+(def g-clef (Clef. :clef-g 64 2))                           ; bottom-note E5
+(def f-clef (Clef. :clef-f 43 6))                           ; bottom-note G3
+
+(defn vecstr [v] (string/join " " v))                       ; [1 2 3] -> "1 2 3"
+
 (def charwidth 0.345)
 (def charheight 0.0875)
-(def note-z 0.05)
+(def note-dx (* 2 charwidth))                               ; width of one note with/without dot
+(def note-dy charheight)                                    ; height of one note
+(def note-z 0.05)                                           ; placement of note forward from staff
 
 (defn glyph
   ([g pos] (glyph g pos {}))
-  ([g pos attrs] [:a-entity (merge {:text     (str "text: " (g glyphs) "; font: Bravura")
+  ([g pos attrs] [:a-entity (merge {:text     (str "text: " (glyphs g) "; font: Bravura")
                                     :position (vecstr pos)
                                     :material "color: #000"
                                     :key      (str pos g)}
                                    attrs)]))
 
-(defn map-glyphs [gs pos] (map (fn [g i] (glyph g
-                                                (assoc pos 0 (+ (first pos)
-                                                                (* i charwidth)))))
-                               gs (range)))
-
-(defn event->glyphs [event is-above-middle-staff]
-  (let [nv (name (:note-value event))
-        nv-no-dot (clojure.string/replace nv "." "")
-        t (type event)
-        tail-dir (if is-above-middle-staff "-dn" "-up")
-        glyph-key (keyword (cond
-                             (= Rest t) (str "rest-" nv-no-dot)
-                             (contains? #{Note Chord} t) (str "note-" nv-no-dot tail-dir)))
-        dotted (= "." (last nv))]
-    (filter identity [glyph-key
-                      (if dotted :note-dot)])))
-
-
-
-(defn staff [n] (->> (range 0 n)
+(defn staff [n] (->> (range 0 (* 2 n))
                      (map (fn [i] (glyph :staff-5 [(* i charwidth) 0 0] {:material "color: #666"})))))
+
+(defn clef [c] (glyph (:glyph c) [0 (* note-dy (:staff-offset c)) 0] {:material "color: #666"}))
+
+
+(defn event [e clef key-name]
+  (let [t (type e)
+        clef-bottom-note-name (note-num->note-name (:bottom-note clef) :C)
+        note-name-cycle-up (drop-while #(not= clef-bottom-note-name %) pc-cycle-nat-up)
+        note-name-cycle-dn (drop-while #(not= clef-bottom-note-name %) pc-cycle-nat-dn)
+        note->y-pos (fn [n] (let
+                              [dist-from-bottom (- n (:bottom-note clef)) ;distance in note-num
+                               octaves-from-bottom (int (/ dist-from-bottom 12))
+                               note-name-cycle (if (< dist-from-bottom 0)
+                                                 note-name-cycle-dn
+                                                 note-name-cycle-up)
+                               note-name-dy-map (map (fn [a b] ; ([:E 0] [:F 1] [:G 2] [:A 3] [:B 4] ...)
+                                                       [a (if (< dist-from-bottom 0)
+                                                            (* -1 b)
+                                                            b)])
+                                                     note-name-cycle (range))
+                               natural-note-name (keyword (first (name (note-num->note-name n key-name))))
+
+                               ]
+                              (+ (* octaves-from-bottom 7)
+                                 (last                      ; 2
+                                   (first                   ; [:G 2]
+                                     (drop-while #(not= (first %) ; cycle note-names until match
+                                                        natural-note-name)
+                                                 note-name-dy-map)))
+                                 )
+                              ))
+        is-above-middle-staff (fn [y-pos] (>= y-pos 4))
+        event->glyphs (fn [event is-above-middle-staff]
+                        (let [nv (name (:note-value event))
+                              nv-no-dot (clojure.string/replace nv "." "")
+                              tail-dir (if is-above-middle-staff "-dn" "-up")
+                              glyph-key (keyword
+                                          (cond
+                                            (= Rest t) (str "rest-" nv-no-dot)
+                                            (contains? #{Note Chord} t) (str "note-" nv-no-dot tail-dir)))
+                              dotted (= "." (last nv))]
+                          (filter identity [glyph-key
+                                            (if dotted :note-dot)])))
+        map-glyphs (fn [gs pos] (map (fn [g i] (glyph g
+                                                      (assoc pos 0 (+ (first pos)
+                                                                      (* i charwidth)))
+                                                      {:key (str g i)}))
+                                     gs (range)))
+        y-positions (cond
+                      (= Rest t) #{4}
+                      (= Note t) (map note->y-pos #{(:data e)})
+                      (= Chord t) (map note->y-pos (:data e)))
+        evt-glyphs (event->glyphs e (is-above-middle-staff (first y-positions)))
+        ]
+
+    (map (fn [y-pos] (map-glyphs evt-glyphs [0 (* y-pos note-dy) note-z]))
+         y-positions)
+    ; TODO: ledger lines
+    ))
+
+
+
 
 (defn home-page []
   [:a-scene
    [:a-sun-sky {:material "sunPosition: 1 1 0"}]
    [:a-entity {:position "0 0 -5"}
-    (staff 4)
-    ;TODO position vertically given note-num and clef
-    (map-glyphs (event->glyphs (Note. 60 :2.) true) [0 0 note-z])
-    (map-glyphs (event->glyphs (Note. 60 :4) true) [(* 2 charwidth) (* 2 charheight) note-z])
-    [:a-entity {:text     (str "text: " (:t @appstate))
-                :position "-1 0 -5"
-                :abcd     ""
-                :material "color: #544"}]
-    [:a-entity {:text     "text: \uE1D9; font: Bravura"
-                :position "1 0 -5"
-                :material "color: #544"}]]
+
+    [:a-entity {:position (vecstr [(* -1 note-dx) 0 0])}    ; g clef
+     (staff 1)
+     (clef g-clef)]
+
+
+    [:a-entity                                              ; 1 chord
+     (staff 1)
+     (event (Chord. #{60 64 69} :2.) g-clef :C)]
+    [:a-entity {:position (vecstr [(* 1 note-dx) 0 0])}     ; 2 chord
+     (staff 1)
+     (event (Chord. #{62 66 73} :4) g-clef :C)]
+    [:a-entity {:position (vecstr [(* 2 note-dx) 0 0])}     ; 3 note
+     (staff 1)
+     (event (Note. 80 :4) g-clef :C)]
+
+    [:a-entity {:position (vecstr [0 (* -12 note-dy) 0])}
+
+     [:a-entity {:position (vecstr [(* -1 note-dx) 0 0])}    ; f clef
+      (staff 1)
+      (clef f-clef)]
+
+     [:a-entity                                              ; 1 chord
+      (staff 1)
+      (event (Chord. #{40 44 48} :2.) f-clef :C)]
+     [:a-entity {:position (vecstr [(* 1 note-dx) 0 0])}     ; 2 chord
+      (staff 1)
+      (event (Chord. #{42 46 53} :4) f-clef :C)]
+     [:a-entity {:position (vecstr [(* 2 note-dx) 0 0])}     ; 3 note
+      (staff 1)
+      (event (Note. 60 :4) f-clef :C)]
+     ]
+
+    [:a-entity {:position (vecstr [0 4 0])}
+     [:a-entity {:text     (str "text: " (:t @appstate))
+                 :position "-1 0 -5"
+                 :material "color: #544"}]
+     [:a-entity {:text     "text: \uE1D9; font: Bravura"
+                 :position "1 0 -5"
+                 :material "color: #544"}]]]
    ])
 
 (defn about-page []
