@@ -151,6 +151,7 @@
 ; at some point we'll want to account for musical context (# for ascending accidentals, b for decending) but the rule is ill-defined and subjective: http://music.stackexchange.com/questions/8329/temporarily-changing-keys-which-accidentals-to-use
 ; more here: http://www.themusicalear.com/sharps-or-flats-how-to-spell-notes-correctly/
 ; https://www.wolframalpha.com/input/?i=c-sharp+major+scale
+; TODO: Keys G, D, A have mixed accidentals and should only have sharps
 (defn spell-notes [key]
   (let [
         start-num (:tonic key)

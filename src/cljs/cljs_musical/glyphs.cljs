@@ -2,6 +2,7 @@
 
 (def glyphs
   {
+   :space " "
    :clef-g "\uE050"
    :clef-f "\uE062"
    :staff-5 "\uE014"
