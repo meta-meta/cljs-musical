@@ -11,7 +11,8 @@
         [cljs-musical.library :only [note-num->note-name pc-cycle-nat-up pc-cycle-nat-dn]]))
 
 
-(def appstate (r/atom {:t 0}))
+(def appstate (r/atom {:t 0
+                       :midi-notes {}}))
 
 (defn loopy [t] (mod (inc t) 10))
 
@@ -26,6 +27,19 @@
   (set! (.-intervalid js/window) nil))
 
 
+(def midi (r/atom {:inputs {}}))
+(.then (.requestMIDIAccess (.-navigator js/window))
+       (fn [res] (.forEach (.-inputs res)
+                           #(swap! midi assoc-in [:inputs (.-name %)] %))))
+
+(defn list-midi-inputs [] (keys (:inputs @midi)))
+(defn midi-listen [input-name] (set! (.-onmidimessage (get-in @midi [:inputs input-name]))
+                                     (fn [msg] (let [data (.-data msg)
+                                                     channel (aget data 0)
+                                                     note-num (aget data 1)
+                                                     velocity (aget data 2)]
+                                                 (if (= channel 146)
+                                                   (swap! appstate assoc-in [:midi-notes note-num] velocity))))))
 
 ;; PRESENTATION DATA TYPES
 
