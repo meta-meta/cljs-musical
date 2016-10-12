@@ -40,6 +40,7 @@
                                                      velocity (aget data 2)]
                                                  (if (= channel 146)
                                                    (swap! appstate assoc-in [:midi-notes note-num] velocity))))))
+;(midi-listen "Keystation Pro 88")
 
 ;; PRESENTATION DATA TYPES
 
@@ -175,7 +176,8 @@
 (defn home-page []
   (let [key-name :C
         t (:t @appstate)
-        sunpos (vecstr [1 0 -1])]
+        sunpos (vecstr [1 0 -1])
+        midi-notes (into {} (filter #(> (last %) 0) (:midi-notes @appstate)))]
     [:a-scene
      [:a-sky {:color "#000"}]
      ;[:a-sun-sky {:material (str "shader: sunSky; sunPosition: " sunpos)}]
@@ -196,6 +198,13 @@
 
          ;(staff 1)                                          ;C60 treble cleg
          ;(event (Note. 60 :2) my-clef key-name)
+
+         (staff 1)
+         (map (fn [midi-note] (let [note-num (first midi-note)
+                                    velocity (last midi-note)]
+                                (event (Note. note-num :2) my-clef key-name)))
+              midi-notes)
+
 
          ;[:a-entity                                         ; 1 chord
          ; (staff 1)
