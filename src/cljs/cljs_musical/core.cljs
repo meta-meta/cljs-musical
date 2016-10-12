@@ -69,15 +69,23 @@
 (def note-dy charheight)                                    ; height of one note
 (def note-z 0.05)                                           ; placement of note forward from staff
 
+(defn text
+  ([g pos] (text g pos {}))
+  ([t pos attrs] [:a-entity (merge {:text     (str "text: " t ";")
+                                    :position (vecstr pos)
+                                    :material "color: #666"
+                                    :key      (str pos t)}
+                                   attrs)]))
+
 (defn glyph
   ([g pos] (glyph g pos {}))
   ([g pos attrs] [:a-entity (merge {:text     (str "text: " (glyphs g) "; font: Bravura")
                                     :position (vecstr pos)
-                                    :material "color: #969"
+                                    :material "color: #990"
                                     :key      (str pos g)}
                                    attrs)]))
 
-(defn staff [n] (->> (range 0 (* 3 n))
+(defn staff [n] (->> (range 0 (* 3 n))                      ; 3 possible chars per segment: accidental, note, dot
                      (map (fn [i] (glyph :staff-5 [(* i charwidth) 0 0] {:material "color: #666"})))))
 
 (defn clef [c] (glyph (:glyph c) [0 (* note-dy (:staff-offset c)) 0] {:material "color: #666"}))
@@ -139,7 +147,7 @@
                       (= Rest t) #{[4 " "]}
                       (= Note t) (map (fn [n] [(note->y-pos n) (note->accidental n)]) #{(:data e)})
                       (= Chord t) (map (fn [n] [(note->y-pos n) (note->accidental n)]) (:data e)))
-        evt-glyphs (event->glyphs e (is-above-middle-staff (first y-positions)))
+        evt-glyphs (event->glyphs e (is-above-middle-staff (first (first y-positions)))) ; (first (first ([4 :flat])))
         ]
 
     (map (fn [y-pos] (map-glyphs (cons (last y-pos) evt-glyphs) [0 (* (first y-pos) note-dy) note-z]))
@@ -151,50 +159,64 @@
 
 
 (defn home-page []
-  (let [key-name :A]
+  (let [key-name :C
+        t (:t @appstate)
+        sunpos (vecstr [1 0 -1])]
     [:a-scene
-     [:a-sun-sky {:material "sunPosition: -0.2 0.1 5"}]
+     [:a-sky {:color "#000"}]
+     ;[:a-sun-sky {:material (str "shader: sunSky; sunPosition: " sunpos)}]
+     ;[:a-box {:position (vecstr [(- (:t @appstate) 5) 0 -15]) :material "color: #000"}]
+
+
      [:a-entity {:position "0 0 -5"}
+      (text (str "key of " key-name) [-4 0 0] {:scale (vecstr [0.5 0.5 0.5])}) ; display the key
+      (text (str "t: " (:t @appstate)) [-4 -0.5 0] {:scale (vecstr [0.5 0.5 0.5])}) ; display the time
 
-      [:a-entity {:position (vecstr [(* -1 note-dx) 0 0])}  ; g clef
-       (staff 1)
-       (clef g-clef)]
+      (let [my-clef g-clef]
+        [:a-entity {:position (vecstr [0 0 0])}
+
+         [:a-entity {:position (vecstr [(* -1 note-dx) 0 0])} ; g clef
+          (staff 1)
+          (clef my-clef)]
 
 
-      [:a-entity                                            ; 1 chord
-       (staff 1)
-       (event (Chord. #{60 64 69} :2.) g-clef key-name)]
-      [:a-entity {:position (vecstr [(* 1 note-dx) 0 0])}   ; 2 chord
-       (staff 1)
-       (event (Chord. #{62 66 73} :4) g-clef key-name)]
-      [:a-entity {:position (vecstr [(* 2 note-dx) 0 0])}   ; 3 note
-       (staff 1)
-       (event (Note. 80 :4) g-clef key-name)]
+         ;(staff 1)                                          ;C60 treble cleg
+         ;(event (Note. 60 :2) my-clef key-name)
 
-      [:a-entity {:position (vecstr [0 (* -12 note-dy) 0])}
+         ;[:a-entity                                         ; 1 chord
+         ; (staff 1)
+         ; (event (Chord. #{60 64 69} :2.) my-clef key-name)]
+         ;[:a-entity {:position (vecstr [(* 1 note-dx) 0 0])} ; 2 chord
+         ; (staff 1)
+         ; (event (Chord. #{62 66 73} :4) my-clef key-name)]
+         ;[:a-entity {:position (vecstr [(* 2 note-dx) 0 0])} ; 3 note
+         ; (staff 1)
+         ; (event (Note. 80 :4) my-clef key-name)]
+         ]
+        )
 
-       [:a-entity {:position (vecstr [(* -1 note-dx) 0 0])} ; f clef
-        (staff 1)
-        (clef f-clef)]
+      (let [my-clef f-clef]
+        [:a-entity {:position (vecstr [0 (* -12 note-dy) 0])}
 
-       [:a-entity                                           ; 1 chord
-        (staff 1)
-        (event (Chord. #{40 44 48} :2.) f-clef key-name)]
-       [:a-entity {:position (vecstr [(* 1 note-dx) 0 0])}  ; 2 chord
-        (staff 1)
-        (event (Chord. #{42 46 53} :4) f-clef key-name)]
-       [:a-entity {:position (vecstr [(* 2 note-dx) 0 0])}  ; 3 note
-        (staff 1)
-        (event (Note. 60 :4) f-clef key-name)]
-       ]
+         [:a-entity {:position (vecstr [(* -1 note-dx) 0 0])} ; f clef
+          (staff 1)
+          (clef my-clef)]
 
-      [:a-entity {:position (vecstr [0 4 0])}
-       [:a-entity {:text     (str "text: " (:t @appstate))
-                   :position "-1 0 -5"
-                   :material "color: #544"}]
-       [:a-entity {:text     "text: \uE1D9; font: Bravura"
-                   :position "1 0 -5"
-                   :material "color: #544"}]]]
+         ;(staff 1)                                          ;C60 bass clef
+         ;(event (Note. 60 :2) my-clef key-name)
+
+         ;[:a-entity                                         ; 1 chord
+         ; (staff 1)
+         ; (event (Chord. #{40 44 48} :2.) my-clef key-name)]
+         ;[:a-entity {:position (vecstr [(* 1 note-dx) 0 0])} ; 2 chord
+         ; (staff 1)
+         ; (event (Chord. #{42 46 53} :4) my-clef key-name)]
+         ;[:a-entity {:position (vecstr [(* 2 note-dx) 0 0])} ; 3 note
+         ; (staff 1)
+         ; (event (Note. 60 :4) my-clef key-name)]
+         ])
+
+      ]
      ]))
 
 (defn about-page []
