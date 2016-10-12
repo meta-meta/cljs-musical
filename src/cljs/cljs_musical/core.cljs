@@ -38,8 +38,10 @@
                                                      channel (aget data 0)
                                                      note-num (aget data 1)
                                                      velocity (aget data 2)]
-                                                 (if (= channel 146)
-                                                   (swap! appstate assoc-in [:midi-notes note-num] velocity))))))
+                                                 ;(if (= channel 146))
+                                                 (swap! appstate assoc-in [:midi-notes note-num] velocity)))))
+(midi-listen "USB Axiom 49")
+;(midi-listen "EWI-USB")
 ;(midi-listen "Keystation Pro 88")
 
 
